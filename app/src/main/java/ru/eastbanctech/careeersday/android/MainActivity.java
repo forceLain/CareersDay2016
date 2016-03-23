@@ -1,31 +1,38 @@
 package ru.eastbanctech.careeersday.android;
 
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.support.v7.widget.LinearLayoutManager;
-import android.support.v7.widget.RecyclerView;
+import android.os.Handler;
+import android.os.Message;
+import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.SwitchCompat;
-import android.util.Log;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.ViewGroup;
+import android.widget.Toast;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 import butterknife.Bind;
 import butterknife.ButterKnife;
+import butterknife.OnClick;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
 
 public class MainActivity extends AppCompatActivity {
 
-    @Bind(R.id.recycler_view) RecyclerView recyclerView;
-    private BulbAdapter adapter;
+    private static final long TIME_OUT = 5000;
+    @Bind(R.id.switch1) SwitchCompat switchView1;
+    @Bind(R.id.switch2) SwitchCompat switchView2;
+    @Bind(R.id.switch3) SwitchCompat switchView3;
     private WebApi webApi;
+
+    Handler handler = new Handler(new Handler.Callback() {
+        @Override
+        public boolean handleMessage(Message msg) {
+            updateBulbList();
+            return false;
+        }
+    });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,12 +40,23 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
 
-        WebService webService = new WebService(this);
-        webApi = webService.getWebApi();
-        recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new BulbAdapter();
-        recyclerView.setAdapter(adapter);
+        webApi = new Retrofit.Builder()
+                .baseUrl(getString(R.string.api_url))
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
+                .create(WebApi.class);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
         updateBulbList();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        handler.removeCallbacksAndMessages(null);
     }
 
     private void updateBulbList() {
@@ -46,80 +64,38 @@ public class MainActivity extends AppCompatActivity {
         call.enqueue(new Callback<Map<String, Boolean>>() {
             @Override
             public void onResponse(Call<Map<String, Boolean>> call, Response<Map<String, Boolean>> response) {
-                adapter.setBulbList(response.body());
+                Map<String, Boolean> map = response.body();
+                String bulbName1 = (String) switchView1.getTag();
+                String bulbName2 = (String) switchView2.getTag();
+                String bulbName3 = (String) switchView3.getTag();
+                switchView1.setChecked(map.get(bulbName1));
+                switchView2.setChecked(map.get(bulbName2));
+                switchView3.setChecked(map.get(bulbName3));
+                handler.sendEmptyMessageDelayed(0, TIME_OUT);
             }
 
             @Override
             public void onFailure(Call<Map<String, Boolean>> call, Throwable t) {
-
+                handler.sendEmptyMessageDelayed(0, TIME_OUT);
             }
         });
     }
 
-    private void updateBulb(String name, boolean value) {
-        Call<Boolean> call = webApi.switchBulb(name, value);
+    @OnClick({R.id.switch1, R.id.switch2, R.id.switch3})
+    void onSwitchBoxClicked(SwitchCompat view) {
+        final String bulbName = (String) view.getTag();
+
+        final Call<Boolean> call = webApi.switchBulb(bulbName, view.isChecked());
         call.enqueue(new Callback<Boolean>() {
             @Override
             public void onResponse(Call<Boolean> call, Response<Boolean> response) {
-                updateBulbList();
+                Toast.makeText(MainActivity.this, bulbName + " is changed successfully", Toast.LENGTH_SHORT).show();
             }
 
             @Override
             public void onFailure(Call<Boolean> call, Throwable t) {
-
+                Toast.makeText(MainActivity.this, bulbName + " change error", Toast.LENGTH_SHORT).show();
             }
         });
-    }
-
-    private class BulbAdapter extends RecyclerView.Adapter<BulbViewHolder> {
-
-        private List<String> bulbList = new ArrayList<>();
-        private Map<String, Boolean> bulbMap;
-
-        @Override
-        public BulbViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.bulb_item, parent, false);
-            return new BulbViewHolder(view);
-        }
-
-        @Override
-        public void onBindViewHolder(BulbViewHolder holder, int position) {
-            final String name = bulbList.get(position);
-            holder.switchCompat.setText(name);
-            Boolean isOn = bulbMap.get(name);
-            holder.switchCompat.setChecked(isOn);
-            holder.switchCompat.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    SwitchCompat switchCompat = (SwitchCompat) v;
-                    boolean checked = switchCompat.isChecked();
-                    updateBulb(name, checked);
-                }
-            });
-        }
-
-        @Override
-        public int getItemCount() {
-            return bulbList.size();
-        }
-
-        public void setBulbList(Map<String, Boolean> bulbMap) {
-            this.bulbList.clear();
-            if (bulbMap != null) {
-                this.bulbList.addAll(bulbMap.keySet());
-            }
-            this.bulbMap = bulbMap;
-            notifyDataSetChanged();
-        }
-    }
-
-    static class BulbViewHolder extends RecyclerView.ViewHolder {
-
-        @Bind(R.id.bulb_switch) SwitchCompat switchCompat;
-
-        public BulbViewHolder(View view) {
-            super(view);
-            ButterKnife.bind(this, view);
-        }
     }
 }
