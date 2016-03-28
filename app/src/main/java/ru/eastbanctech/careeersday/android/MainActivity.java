@@ -68,9 +68,9 @@ public class MainActivity extends AppCompatActivity {
                 String bulbName1 = (String) switchView1.getTag();
                 String bulbName2 = (String) switchView2.getTag();
                 String bulbName3 = (String) switchView3.getTag();
-                switchView1.setChecked(map.get(bulbName1));
-                switchView2.setChecked(map.get(bulbName2));
-                switchView3.setChecked(map.get(bulbName3));
+                switchView1.setChecked(map.get(bulbName1) != null ? map.get(bulbName1) : false);
+                switchView2.setChecked(map.get(bulbName2) != null ? map.get(bulbName2) : false);
+                switchView3.setChecked(map.get(bulbName3) != null ? map.get(bulbName3) : false);
                 handler.sendEmptyMessageDelayed(0, TIME_OUT);
             }
 
